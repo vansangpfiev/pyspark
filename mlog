@@ -1,0 +1,17 @@
+parasilo-6
+meterid     and    $eq        and      1
+hdfs://parasilo-1:8020/user/meterdata/file0.csv
+dgdfgdfdfdf
+
+
+
+select sum(measurement)*0.1114 as hr from indexes where id = 1 and hour(date) in (1,2,3,4,5,6,7,15,16,17) union all select sum(measurement)*0.16 as hr from  indexes where meterid = 1 and hour(date) not in (1,2,3,4,5,6,7,15,16,17)
+12
++----+
+|  hr|
++----+
+|null|
+|null|
++----+
+
+Executed Query 6
