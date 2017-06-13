@@ -25,7 +25,7 @@ filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),Fil
 PySparkMain.main("query2", Constant.HDFS_DIR, filters,filters1, "localhost")
 print "Executed Query 2"
 
-filters = [FilterExpression("measurement", "0.6", OperatorType.GREATER), FilterExpression("measurement", "1.0", OperatorType.LOWER)]
+filters = [FilterExpression("measurement", "0.4", OperatorType.GREATER), FilterExpression("measurement", "0.8", OperatorType.LOWER)]
 filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),FilterExpression("date", "2013-05-01 17:00:00", OperatorType.EQ)]
 # filters1 = []
 PySparkMain.main("query3", Constant.HDFS_DIR, filters,filters1, "localhost")

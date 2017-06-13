@@ -19,91 +19,53 @@ dir = 'hdfs://' + sys.argv[1] + ':8020/user/meterdata'
 mnode = sys.argv[2]
 print mnode
 
-filters = [FilterExpression("meterid", "5", OperatorType.GREATER),FilterExpression("meterid", "300", OperatorType.LOWER)]
-PySparkMain.main("query1", dir, filters, mnode)
+
+################
+filters = [FilterExpression("measurement", "0.5", OperatorType.GREATER), FilterExpression("measurement", "0.9", OperatorType.LOWER)]
+filters1 = []
+PySparkMain.main("query1", dir, filters,filters1, mnode)
 print "Executed Query 1"
 time.sleep(5)
 
-filters = [FilterExpression("meterid", "5", OperatorType.GREATER),FilterExpression("meterid", "300", OperatorType.LOWER)]
-PySparkMain.main("query1", dir, filters, mnode)
-print "Executed Query 1"
-time.sleep(5)
-
-
-
-filters = [FilterExpression("meterid", "150", OperatorType.GREATER),FilterExpression("meterid", "1200", OperatorType.LOWER)]
-PySparkMain.main("query2", dir, filters, mnode)
+filters = [FilterExpression("measurement", "0.5", OperatorType.GREATER)]
+filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),FilterExpression("date", "2013-05-01 17:00:00", OperatorType.EQ)]
+PySparkMain.main("query2", dir, filters,filters1, mnode)
 print "Executed Query 2"
 time.sleep(5)
 
-filters = [FilterExpression("meterid", "150", OperatorType.GREATER),FilterExpression("meterid", "1200", OperatorType.LOWER)]
-PySparkMain.main("query2", dir, filters, mnode)
-print "Executed Query 2"
-time.sleep(5)
-
-
-
-filters = [FilterExpression("meterid", "5", OperatorType.GREATER),FilterExpression("meterid", "300", OperatorType.LOWER)]
-PySparkMain.main("query3", dir, filters, mnode)
-print "Executed Query 3"
-time.sleep(5)
-
-filters = [FilterExpression("meterid", "5", OperatorType.GREATER),FilterExpression("meterid", "300", OperatorType.LOWER)]
-PySparkMain.main("query3", dir, filters, mnode)
+filters = [FilterExpression("measurement", "0.4", OperatorType.GREATER), FilterExpression("measurement", "0.8", OperatorType.LOWER)]
+filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),FilterExpression("date", "2013-05-01 17:00:00", OperatorType.EQ)]
+PySparkMain.main("query3", dir, filters,filters1, mnode)
 print "Executed Query 3"
 time.sleep(5)
 
 
-
-filters = [FilterExpression("measurement", "0.85", OperatorType.GREATER)]
-PySparkMain.main("query4", dir, filters, mnode)
+filters = [FilterExpression("measurement", "0.85", OperatorType.LOWER), FilterExpression("measurement", "0.5", OperatorType.GREATER)]
+filters1 = []
+PySparkMain.main("query4", dir, filters,filters1, mnode)
 print "Executed Query 4"
 time.sleep(5)
 
-filters = [FilterExpression("measurement", "0.85", OperatorType.GREATER)]
-PySparkMain.main("query4", dir, filters, mnode)
-print "Executed Query 4" 
-time.sleep(5)
 
-
-
-filters = [FilterExpression("measurement", "0.57", OperatorType.GREATER), FilterExpression("meterid", "2000", OperatorType.LOWER)]
-PySparkMain.main("query5", dir, filters, mnode)
-print "Executed Query 5" 
-time.sleep(5)
-
-
-filters = [FilterExpression("measurement", "0.57", OperatorType.GREATER), FilterExpression("meterid", "2000", OperatorType.LOWER)]
-PySparkMain.main("query5", dir, filters, mnode)
+filters = [FilterExpression("measurement", "0.5", OperatorType.GREATER)]
+filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),FilterExpression("date", "2013-05-01 17:00:00", OperatorType.EQ)]
+PySparkMain.main("query5", dir, filters,filters1, mnode)
 print "Executed Query 5"
 time.sleep(5)
 
 
-
 filters = [FilterExpression("meterid", "1", OperatorType.EQ)]
-PySparkMain.main("query6", dir, filters, mnode)
-print "Executed Query 6"
+filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),FilterExpression("date", "2013-04-01 17:00:00", OperatorType.EQ)]
+PySparkMain.main("query6", dir, filters, filters1, mnode)
+print "Executed Query 6	"
 time.sleep(5)
 
-filters = [FilterExpression("meterid", "1", OperatorType.EQ)]
-PySparkMain.main("query6", dir, filters, mnode)
-print "Executed Query 6"
+
+filters = [FilterExpression("meterid", "30", OperatorType.LOWER)]
+filters1 = [FilterExpression("date", "2013-03-01 17:00:00", OperatorType.EQ),FilterExpression("date", "2013-04-01 17:00:00", OperatorType.EQ)]
+PySparkMain.main("query7", dir, filters, filters1, mnode)
+print "Executed Query 7	"
 time.sleep(5)
-
-#filters = [FilterExpression("meterid", "1", OperatorType.EQ)]
-#PySparkMain.main("query6", dir, filters, mnode)
-#print "Executed Query 6"
-#time.sleep(10)
-
-filters = [FilterExpression("meterid", "0", OperatorType.GREATER), FilterExpression("meterid", "300", OperatorType.LOWER)]
-PySparkMain.main("query7", dir, filters, mnode)
-print "Executed Query 7"
-time.sleep(5)
-
-filters = [FilterExpression("meterid", "0", OperatorType.GREATER), FilterExpression("meterid", "300", OperatorType.LOWER)]
-PySparkMain.main("query7", dir, filters, mnode)
-print "Executed Query 7"
-
 
 print ""
 

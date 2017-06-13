@@ -101,7 +101,7 @@ def main(qtype, qfile, filters, filters1, mnode):
 
 
     log_fname = os.getcwd() + "/sexecTime"
-    with open("/home/paladin/Desktop/pyspark/sexecTime", "a") as myfile:
+    with open(log_fname, "a") as myfile:
         myfile.write(qtype + "," + str(t_index) + "," + str(t_query) + "," + str(t_index + t_query) + "\n")
     
 #print qtype + "," + str(t_index) + "," + str(t_plan) + "," + str(t_query) + "," + str(t_index+t_plan+t_query)

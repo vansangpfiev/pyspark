@@ -139,7 +139,7 @@ class Metric:
 	                    resSDate = collectionTmp.find({"hist.date": startDate, "name": value}, {"hist": {
 	                    "$elemMatch": {"date": {filterTmp[0].getOperator(): startDate}}}})
 	                    
-	                    resEDate = collectionTmp.find({"hist.date": startDate, "name": value}, {"hist": {
+	                    resEDate = collectionTmp.find({"hist.date": endDate, "name": value}, {"hist": {
 	                    "$elemMatch": {"date": {filterTmp[1].getOperator(): endDate}}}})
 	                
 	                    

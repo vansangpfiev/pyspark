@@ -6,7 +6,7 @@ class queries :
         self.query2 = "SELECT SUM(measurement)  FROM " + filepath + " WHERE measurement > 0.5"\
         				+ " AND date > timestamp '2013-03-01 17:00:00' AND date < timestamp '2013-05-01 17:00:00'"
 
-        self.query3 = "SELECT SUM(measurement)  FROM " + filepath + " WHERE measurement > 0.6 AND measurement < 1.0"\
+        self.query3 = "SELECT SUM(measurement)  FROM " + filepath + " WHERE measurement > 0.4 AND measurement < 0.8"\
         				+ " AND date > timestamp '2013-03-01 17:00:00' AND date < timestamp '2013-05-01 17:00:00'"
 
         self.query4 = "SELECT id, meterid, date, measurement  FROM " + filepath \

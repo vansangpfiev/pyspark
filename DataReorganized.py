@@ -14,8 +14,8 @@ from Constant import Constant
 
 
 class DataReorganized:
-	def __init__(self, host, port):
-		self.mongoClient = MongoClient(host, port)
+	def __init__(self, snode, mnode, port):
+		self.mongoClient = MongoClient(mnode, port)
 		self.db = self.mongoClient.indexes
 		self.hdfsClient = Config().get_client('dev')
 		self.spark = SparkSession.builder.appName("Spark with secondary indexes").getOrCreate() 
@@ -26,10 +26,13 @@ class DataReorganized:
         	StructField("date", TimestampType(), True),
         	StructField("obs", StringType(), True)])
 		self.sqlContext = SQLContext(self.spark)
+		self.MONGO_METERDATA_COLLECTION_DIR = "mongodb://" + mnode + ":27017/indexes.meterdata"
+		self.HDFS_DIR = "hdfs://"+snode+":8020/user/meterdata"
 
 
 	def reorganizeByTimestamp(self, filenames, hdfsClientDir):
 		# filenames = ['file0.csv','file1.csv','file2.csv','file3.csv','file4.csv','file5.csv','file6.csv','file7.csv','file8.csv','file9.csv']
+		MONGO_METERDATA_COLLECTION_DIR = self.MONGO_METERDATA_COLLECTION_DIR
 		HOURS_PER_FILE = 8760 * 3600
 		MIN_TIMESTAMP = 1356998400   #2013-01-01 00:00:00
 		TIMESTAMPS_PER_FILE = int(HOURS_PER_FILE/len(filenames))
@@ -41,7 +44,7 @@ class DataReorganized:
 		filesToDelete = filenames
 		
 		for f in filenames:
-			hdfsFiles += Constant.HDFS_DIR + f + ","
+			hdfsFiles += self.HDFS_DIR + "/" + f + ","
 		
 		dataAfterReorganized = [None]*len(filenames)
 
@@ -56,9 +59,10 @@ class DataReorganized:
 			self.db.meterdata.remove({"fname": filesToDelete[i]})
 
 			dataAfterReorganized[i] = dataOrderByDate.filter(dataOrderByDate.date >= datetime.datetime.fromtimestamp(MIN_TIMESTAMP + TIMESTAMPS_PER_FILE*i)).filter(dataOrderByDate.date < datetime.datetime.fromtimestamp(MIN_TIMESTAMP + TIMESTAMPS_PER_FILE*(i + 1)))
-			dataAfterReorganized[i].repartition(1).write.mode("append").csv(Constant.HDFS_DIR)
+			dataAfterReorganized[i].repartition(1).write.mode("append").csv(self.HDFS_DIR)
 		
-			self.createHistogramByPandas(filenames[i], dataAfterReorganized[i])
+			# self.createHistogramByPandas(filenames[i], dataAfterReorganized[i])
+			self.createHistogramBySpark(filenames[i], dataAfterReorganized[i])
 
 			files = hdfsClient.list(hdfsClientDir)
 			for f in files:
@@ -66,7 +70,7 @@ class DataReorganized:
 					hdfsClient.rename(hdfsClientDir+f,hdfsClientDir+filenames[i])
 
 			dataAfterReorganized[i].drop('obs').drop('date').withColumn('fname', lit(filenames[i])).write.format("com.mongodb.spark.sql.DefaultSource")\
-               .option("spark.mongodb.output.uri", Constant.MONGO_METERDATA_COLLECTION_DIR)\
+               .option("spark.mongodb.output.uri", MONGO_METERDATA_COLLECTION_DIR)\
                .mode("append")\
                .save()
 		self.deleteHDFSFiles(filesToDelete, hdfsClientDir)
@@ -74,12 +78,14 @@ class DataReorganized:
 
 
 	def reorganizeByMeasurement(self, filenames, hdfsClientDir):
+		MONGO_METERDATA_COLLECTION_DIR = self.MONGO_METERDATA_COLLECTION_DIR
+		HOURS_PER_FILE = 8760 * 3600
 		hdfsClient = self.hdfsClient
 		sqlContext = self.sqlContext
 		customSchema = self.customSchema
 		hdfsFiles = ""
 		for f in filenames:
-			hdfsFiles += Constant.HDFS_DIR + f + ","
+			hdfsFiles += self.HDFS_DIR + "/" + f + ","
 		dataAfterReorganized = [None]*len(filenames)
 		
 		filesToDelete = filenames
@@ -95,27 +101,29 @@ class DataReorganized:
 			self.db.meterdata.remove({"fname": filesToDelete[i]})
 			dataAfterReorganized[i] = dataOrderByMeasurement.filter(dataOrderByMeasurement.rank >= i * 43800).filter(dataOrderByMeasurement.rank < 1 + (i + 1) * 43800).drop('rank')
 		
-			dataAfterReorganized[i].repartition(1).write.mode("append").csv(Constant.HDFS_DIR)
+			dataAfterReorganized[i].repartition(1).write.mode("append").csv(self.HDFS_DIR)
 		
-			self.createHistogramByPandas(filenames[i], dataAfterReorganized[i])
+			# self.createHistogramByPandas(filenames[i], dataAfterReorganized[i])
+			self.createHistogramBySpark(filenames[i], dataAfterReorganized[i])
 
 			files = hdfsClient.list(hdfsClientDir)
 			for f in files:
 				if "part-00" in f:
 					hdfsClient.rename(hdfsClientDir+f,hdfsClientDir+filenames[i])
 			dataAfterReorganized[i].drop('obs').drop('date').withColumn('fname', lit(filenames[i])).write.format("com.mongodb.spark.sql.DefaultSource")\
-               .option("spark.mongodb.output.uri", Constant.MONGO_METERDATA_COLLECTION_DIR)\
+               .option("spark.mongodb.output.uri", MONGO_METERDATA_COLLECTION_DIR)\
                .mode("append")\
                .save()
 		self.deleteHDFSFiles(filesToDelete, hdfsClientDir)
 		# dir = '/data-re/'
 
 	def reorganizeByMeterId(self, filenames, hdfsClientDir):
-		
+		MONGO_METERDATA_COLLECTION_DIR = self.MONGO_METERDATA_COLLECTION_DIR
+		HOURS_PER_FILE = 8760 * 3600
 		hdfsClient = self.hdfsClient
 		hdfsFiles = ""
 		for f in filenames:
-			hdfsFiles += Constant.HDFS_DIR + f + ","
+			hdfsFiles += self.HDFS_DIR + "/" + f + ","
 		dataAfterReorganized = [None]*len(filenames)
 		sqlContext = self.sqlContext
 		customSchema = self.customSchema
@@ -130,19 +138,20 @@ class DataReorganized:
 
 		for i in range(0, len(filenames)):
 			self.db.histogram.remove({"name": filesToDelete[i]})
-			self.db.population.remove({"fname": filesToDelete[i]})
+			self.db.meterdata.remove({"fname": filesToDelete[i]})
 			dataAfterReorganized[i] = dataOrderByMeterId.filter(dataOrderByMeterId.rank >= i * 43800).filter(dataOrderByMeterId.rank < 1 + (i + 1) * 43800).drop('rank')
 		
-			dataAfterReorganized[i].repartition(1).write.mode("append").csv(Constant.HDFS_DIR)
+			dataAfterReorganized[i].repartition(1).write.mode("append").csv(self.HDFS_DIR)
 		
-			self.createHistogramByPandas(filenames[i], dataAfterReorganized[i])
+			# self.createHistogramByPandas(filenames[i], dataAfterReorganized[i])
+			self.createHistogramBySpark(filenames[i], dataAfterReorganized[i])
 
 			files = hdfsClient.list(hdfsClientDir)
 			for f in files:
 				if "part-00" in f:
 					hdfsClient.rename(hdfsClientDir+f,hdfsClientDir+filenames[i])
 			dataAfterReorganized[i].drop('obs').drop('date').withColumn('fname', lit(filenames[i])).write.format("com.mongodb.spark.sql.DefaultSource")\
-               .option("spark.mongodb.output.uri", Constant.MONGO_METERDATA_COLLECTION_DIR)\
+               .option("spark.mongodb.output.uri", MONGO_METERDATA_COLLECTION_DIR)\
                .mode("append")\
                .save()
 		self.deleteHDFSFiles(filesToDelete, hdfsClientDir)
@@ -170,6 +179,24 @@ class DataReorganized:
 		json.dumps(data)
 		self.db.histogram.insert_one(data)	
 
+	def createHistogramBySpark(self, filename, sparkDataFrame):
+		data = {}
+		data["name"] = filename
+		hist = []
+		sparkDataFrame.createOrReplaceTempView("data")
+		sql = "select date, count(*) as count from data group by date order by date"
+		results = self.sqlContext.sql(sql).collect()
+		size = len(results)
+		count = 0
+
+		for i in range(0, size - 1):
+			count += results[i][1]
+			hist.append({"date": str(results[i][0]), "cumulation": count})
+
+		data["hist"] = hist	
+		json.dumps(data)
+		self.db.histogram.insert_one(data)
+	
 	def deleteHDFSFiles(self, filenames, hdfsClientDir):
 		hdfsClient = self.hdfsClient
 		allHDFSFiles = hdfsClient.list(hdfsClientDir)
@@ -180,6 +207,7 @@ class DataReorganized:
 def millis():
     return int(round(time.time() * 1000))
 
+# change name for file 
 def appendMeasurementPrefix(filenames):
 	for i in range(0, len(filenames) - 1):
 		filenames[i] = filenames[i].replace('time-', '')

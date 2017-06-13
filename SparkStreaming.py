@@ -1,6 +1,7 @@
 import sys
 import ast
 import time
+import os
 from pyspark import SparkContext
 from pyspark.streaming import StreamingContext
 from pyspark.streaming.kafka import KafkaUtils
@@ -12,13 +13,17 @@ def millis():
 
 
 def main():	
-	WINDOW_LENGTH = 600
-	SLIDE_LENGTH = 600
+	WINDOW_LENGTH = 480
+	SLIDE_LENGTH = 480
+	checkpoint =  os.getcwd() + "/checkpoint"
 	print len(sys.argv)
 	sc = SparkContext(appName="PythonStreamingKafka")
 	ssc = StreamingContext(sc, 15)
-	ssc.checkpoint("/home/paladin/Desktop/checkpoint") 
-	zkQuorum, topic = sys.argv[1:]
+	ssc.checkpoint(checkpoint) 
+	topic = "test"
+	zkQuorum = sys.argv[2]
+	snode = sys.argv[1]
+	mnode = sys.argv[2]
 	kvs = KafkaUtils.createStream(ssc, zkQuorum, "spark-streaming-consumer", {topic: 1})
 	lines = kvs.map(lambda x: x[1])
 	lines = lines.window(WINDOW_LENGTH,SLIDE_LENGTH)
@@ -31,26 +36,29 @@ def main():
 		else:
 			return 0
 
-	def process(rdd):
+	def process(snode, mnode, rdd):
 		interFilenames = set()
 		intraFilenames = set()
-		intraMetricKeys = []
-		interMetricKeys = []
+		TOP_FILES = 5
 
-		INTER_THRESHOLD = 0.075
-		INTRA_THRESHOLD = 0.0372
+		intraMetricTops = rdd.filter(lambda x: ',' not in str(x[0])).filter(lambda x: 'm' not in str(x[0])).top(TOP_FILES, key=lambda x: x[1])
+		interMetricTops = rdd.filter(lambda x: ',' in str(x[0])).top(TOP_FILES, key=lambda x: x[1])
+
+		#inter ((file1.csv,file2.csv), 0.324)
+		#intra (file1.csv, 0.324)
+		INTER_THRESHOLD = float((str(interMetricTops[TOP_FILES - 1]).replace('(','').replace(')','').split(','))[2])
+		INTRA_THRESHOLD = float((str(intraMetricTops[TOP_FILES - 1]).replace('(','').replace(')','').split(','))[1])
 		
-		dataReorganized = DataReorganized('localhost', 27017)
+		dataReorganized = DataReorganized(snode, mnode, 27017)
 
-		# intraMetrics = rdd.filter(lambda x: ',' not in str(x[0])).filter(lambda x: 'm' not in str(x[0])).filter(lambda x: x[1] > INTRA_THRESHOLD)
-		# interMetrics = rdd.filter(lambda x: ',' in str(x[0])).filter(lambda x: x[1] > INTER_THRESHOLD)
+		intraMetrics = rdd.filter(lambda x: ',' not in str(x[0])).filter(lambda x: 'm' not in str(x[0])).filter(lambda x: x[1] >= INTRA_THRESHOLD)
+		interMetrics = rdd.filter(lambda x: ',' in str(x[0])).filter(lambda x: x[1] >= INTER_THRESHOLD)
 
-		intraMetrics = rdd.filter(lambda x: ',' not in str(x[0])).filter(lambda x: 'm' not in str(x[0])).top(10, key=lambda x: x[1])
-		interMetrics = rdd.filter(lambda x: ',' in str(x[0])).top(10, key=lambda x: x[1])
+		
 
-		with open("/home/paladin/Desktop/I", "a") as myfile:
-			myfile.write(str(rdd.filter(lambda x: ',' not in str(x[0])).filter(lambda x: 'm' not in str(x[0])).top(10, key=lambda x: x[1])))
-			myfile.write(str(rdd.filter(lambda x: ',' in str(x[0])).top(10, key=lambda x: x[1])))
+		# with open("/home/paladin/Desktop/I", "a") as myfile:
+		# 	myfile.write(str(rdd.filter(lambda x: ',' not in str(x[0])).filter(lambda x: 'm' not in str(x[0])).top(TOP_FILES, key=lambda x: x[1])))
+		# 	myfile.write(str(rdd.filter(lambda x: ',' in str(x[0])).top(TOP_FILES, key=lambda x: x[1])))
 		allMeters = rdd.filter(lambda x: 'meterid' in str(x[0])).map(lambda x: x[1]).collect()
 		allTimestamps = rdd.filter(lambda x: 'timestamp' in str(x[0])).map(lambda x: x[1]).collect()
 		allMeasurements = rdd.filter(lambda x: 'measurement' in str(x[0])).map(lambda x: x[1]).collect()
@@ -59,43 +67,39 @@ def main():
 		timestampScore = getScore(allTimestamps)
 		measurementScore = getScore(allMeasurements)
 		
-		for intraMetric in intraMetrics:
-			intraMetricKeys.append(((intraMetric.replace('\(','').split(','))[0]).strip())
-		# intraMetricKeys = intraMetrics.map(lambda x: x[0]).collect()
+		# for intraMetric in intraMetrics:
+		# 	intraFilenames.add(((str(intraMetric).replace('(','').replace(')','').split(','))[0]).strip('\''))
+		intraMetricKeys = intraMetrics.map(lambda x: x[0]).collect()
 		for k in intraMetricKeys:
 			intraFilenames.add(k)
-		
-		for interMetric in interMetrics:
-			interWords = interMetric.replace('\)').replace('\(').split(',')
-			interMetricKeys.append((interWords[0]).strip())
-			interMetricKeys.append((interWords[1]).strip())
-		# interMetricKeys = interMetrics.map(lambda x: x[0]).flatMap(lambda x: x).collect()
+				
+		interMetricKeys = interMetrics.map(lambda x: x[0]).flatMap(lambda x: x).collect()
 		for k in interMetricKeys:
 			interFilenames.add(k)
 
 		filenames = list(intraFilenames & interFilenames)
 
-		with open("/home/paladin/Desktop/K","a") as myfile:
-					myfile.write(str(filenames) +" " +str(meterScore) + " "+ str(measurementScore) +" " + str(timestampScore)+ "\n")
+		# with open("/home/paladin/Desktop/K","a") as myfile:
+		# 			myfile.write(str(intraFilenames) + " " + str(interFilenames) + " " +str(filenames) +" " +str(meterScore) + " "+ str(measurementScore) +" " + str(timestampScore)+ "\n")
 
 		if len(filenames) > 0:
 			if getMaxScore(meterScore, timestampScore, measurementScore) == 0:
 				filenamesTimestamp = filter(lambda x: 'time' in x, filenames)
 				filenamesMeasurement = filter(lambda x: 'mea' in x, filenames)
 				filenames = filenamesMeasurement + filenamesTimestamp
-				dataReorganized.reorganizeByMeterId(filenames, "/data-re/")
-				with open("/home/paladin/Desktop/C","a") as myfile:
-					myfile.write("meter score: " +str(meterScore) + "\n")
+				dataReorganized.reorganizeByMeterId(filenames, "/user/meterdata/")
+				# with open("/home/paladin/Desktop/C","a") as myfile:
+				# 	myfile.write("meter score: " +str(meterScore) + "\n")
 			elif getMaxScore(meterScore, timestampScore, measurementScore) == 1:
 				filenames = filter(lambda x: 'time' not in x, filenames)
-				dataReorganized.reorganizeByTimestamp(filenames, "/data-re/")
-				with open("/home/paladin/Desktop/C", "a") as myfile:
-					myfile.write("Reorganize by timestamp" +"\n")
+				dataReorganized.reorganizeByTimestamp(filenames, "/user/meterdata/")
+				# with open("/home/paladin/Desktop/C", "a") as myfile:
+				# 	myfile.write("Reorganize by timestamp" +"\n")
 			elif getMaxScore(meterScore, timestampScore, measurementScore) == 2:
 				filenames = filter(lambda x: 'mea' not in x, filenames)
-				dataReorganized.reorganizeByMeasurement(filenames, "/data-re/")
-				with open("/home/paladin/Desktop/C", "a") as myfile:
-					myfile.write("Reorganize by measurement"+"\n")
+				dataReorganized.reorganizeByMeasurement(filenames, "/user/meterdata/")
+				# with open("/home/paladin/Desktop/C", "a") as myfile:
+				# 	myfile.write("Reorganize by measurement"+"\n")
 			else:
 				print "do nothing"
 
@@ -143,7 +147,11 @@ def main():
 				wi = words[i].split(";")
 				for j in range(i + 1, size + 1):
 					wj = words[j].split(";")
-					yield ((wi[1], wj[1]),((float(wi[2])/float(wi[3]) + float(wj[2])/float(wj[3]))*float(wi[4]),float(wi[4])))
+					if int(filter(str.isdigit, wi[1])) < int(filter(str.isdigit, wj[1])):
+						yield ((wi[1], wj[1]),((float(wi[2])/float(wi[3]) + float(wj[2])/float(wj[3]))*float(wi[4]),float(wi[4])))
+					else:
+						yield ((wj[1], wi[1]),((float(wi[2])/float(wi[3]) + float(wj[2])/float(wj[3]))*float(wi[4]),float(wi[4])))
+
 
 	def getMaxScore(meterid, timestamp, measurement):
 		if meterid > timestamp and meterid > measurement:
@@ -153,7 +161,7 @@ def main():
 		else:
 			return 2
 
-	metrics = lines.flatMap(mapper1).reduceByKeyAndWindow(lambda a, b: ((a[0] + b[0]),(a[1] + b[1])),WINDOW_LENGTH,SLIDE_LENGTH).mapValues(lambda c: c[0]/c[1]).foreachRDD(lambda rdd: process(rdd))
+	metrics = lines.flatMap(mapper1).reduceByKeyAndWindow(lambda a, b: ((a[0] + b[0]),(a[1] + b[1])),WINDOW_LENGTH,SLIDE_LENGTH).mapValues(lambda c: c[0]/c[1]).foreachRDD(lambda rdd: process(snode, mnode, rdd))
 	
 	t2 = millis()
 
